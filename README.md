@@ -55,6 +55,12 @@ Alert = `duration="long"` plus a single sound cue (a short ~1.3s chime by defaul
 
 `dsh web` users: replace `--profile desktop` with `--profile web`.
 
+To pin a version, or when git is unavailable, install the release tarball instead:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "https://github.com/NotLinky671/dsh-notify/releases/latest/download/dsh-notify.tgz"
+```
+
 For local development, link the checkout instead — edits take effect on restart, no reinstall needed:
 
 ```powershell

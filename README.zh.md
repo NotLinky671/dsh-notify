@@ -55,6 +55,12 @@ Windows 原生 toast 提醒插件：把 DSH 里值得注意的事件推到系统
 
 `dsh web` 用户把 `--profile desktop` 换成 `--profile web`。
 
+需要锁定版本、或者 git 不可用时，改用 Release 里的 tarball：
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "https://github.com/NotLinky671/dsh-notify/releases/latest/download/dsh-notify.tgz"
+```
+
 本地开发用软链，改完源码重启即生效，不用重装：
 
 ```powershell
