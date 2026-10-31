@@ -1,0 +1,28 @@
+# dsh-notify bundle patch: inserts the plugin row into the profile roster.
+# Applied as a profile bundle layer (declared by the `dsh.bundle.patch`
+# manifest field in package.json). Activate with:
+#
+#   dsh plugin --profile desktop add "github:<account>/dsh-notify"
+#   dsh plugin --profile desktop add "link:$PWD"        # local development
+#
+# Override any key from the profile's own cordis.patch.yml under `- patch:`
+# targeting `id: dsh-notify`.
+- insert:
+    - id: dsh-notify
+      name: dsh-notify
+      config:
+        notifyTurnEnd: true        # 主会话任务完成横幅
+        notifyTurnError: true      # 主会话失败→强提醒，中断/超限→普通横幅
+        notifyApproval: true       # 需要人工审批→强提醒；策略 never 时只提示已自动拒绝
+        notifyQuestion: true       # 模型提问（ask_user_question）并阻塞等回答→强提醒
+        notifySubagentEnd: false   # 子任务完成（默认关，避免刷屏）
+        contextWarnPercent: 80     # 上下文窗口占用达 80% 时提醒，0 = 关闭
+        contextCooldownMs: 300000  # 同一会话两次上下文告警的最小间隔（5 分钟）
+        dailyTokenBudget: 0        # 当日 token 预算，0 = 关闭（示例：20000000 = 20M）
+        sound: true                # 播放提示音（插件自己播，不走 toast 的 <audio>）
+        soundEvent: Notification.Default   # 声音方案里的事件名；短音约 1.3s
+        criticalRepeat: 1          # 强提醒的提示音重复次数（有上限，不会无限响）
+        clickFocus: true           # 点击通知把 DSH 窗口拉到前台
+        aumid: DeepSeek.Harness.Notify
+        quietHours: null           # 免打扰时段，如 [23, 8] 表示 23:00–08:00 不弹
+        debug: false               # 排查时改 true，会把启动/事件/派发写进 storages\dsh-notify\diag.log

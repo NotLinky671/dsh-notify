@@ -1,0 +1,17 @@
+# Dependencies (this plugin has none, but keep the ignore for local tooling)
+node_modules/
+
+# Logs
+*.log
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local scratch
+*.tgz
+
+# One-off local migration script (contains absolute paths)
+migrate.cmd

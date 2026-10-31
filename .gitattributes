@@ -1,0 +1,5 @@
+# Normalize to LF in the repository; the working copy may use CRLF on Windows.
+* text=auto eol=lf
+
+# Batch files must keep CRLF to be safe on every Windows shell.
+*.cmd text eol=crlf

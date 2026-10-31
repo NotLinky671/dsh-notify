@@ -1,0 +1,44 @@
+{
+  "name": "dsh-notify",
+  "version": "0.1.0",
+  "description": "Windows 原生 toast 提醒插件（暂仅支持 Windows，macOS 计划中）：任务完成/失败/中断、模型提问、需要审批、上下文超阈值、当日 token 预算超支时弹出系统通知",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/core.js",
+    "lib/diag.js",
+    "cordis.patch.yml",
+    "scripts/*.ps1",
+    "scripts/*.vbs",
+    "README.md",
+    "README.zh.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "toast",
+    "notification",
+    "windows"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NotLinky671/dsh-notify.git"
+  },
+  "homepage": "https://github.com/NotLinky671/dsh-notify#readme",
+  "bugs": {
+    "url": "https://github.com/NotLinky671/dsh-notify/issues"
+  },
+  "license": "MIT"
+}
