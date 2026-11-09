@@ -1,7 +1,7 @@
 {
   "name": "dsh-notify",
-  "version": "0.1.0",
-  "description": "Windows 原生 toast 提醒插件（暂仅支持 Windows，macOS 计划中）：任务完成/失败/中断、模型提问、需要审批、上下文超阈值、当日 token 预算超支时弹出系统通知",
+  "version": "0.2.0",
+  "description": "DSH 原生桌面通知插件（Windows toast / macOS 通知中心）：任务完成/失败/中断、模型提问、需要审批、上下文超阈值、当日 token 预算超支时弹出系统通知",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -16,6 +16,9 @@
     "lib/index.js",
     "lib/core.js",
     "lib/diag.js",
+    "lib/transport.js",
+    "lib/transport-win32.js",
+    "lib/transport-darwin.js",
     "cordis.patch.yml",
     "scripts/*.ps1",
     "scripts/*.vbs",
@@ -28,9 +31,11 @@
   "keywords": [
     "dsh",
     "dsh-plugin",
-    "toast",
     "notification",
-    "windows"
+    "toast",
+    "windows",
+    "macos",
+    "osascript"
   ],
   "repository": {
     "type": "git",

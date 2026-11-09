@@ -8,9 +8,20 @@
  */
 
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { approvalPolicy, createCore, DEFAULTS, dayKey, sessionLabel, truncate, turnReasonText } from '../lib/core.js';
+import { apply } from '../lib/index.js';
+import { createTransport, SUPPORTED_PLATFORMS } from '../lib/transport.js';
+import {
+  createDarwinTransport,
+  osascriptArgs,
+  resolveSound,
+  SOUND_DIR,
+  soundRepeats,
+} from '../lib/transport-darwin.js';
+import { createWin32Transport } from '../lib/transport-win32.js';
 
 /** Build a core with captured toasts and controllable projections/state. */
 function harness(overrides = {}) {
@@ -291,4 +302,174 @@ test('notifyQuestion: false disables the ask toast', () => {
     data: { name: 'ask_user_question', arguments: JSON.stringify({ questions: [{ id: 'q', question: 'x' }] }) },
   });
   assert.equal(toasts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Platform transport (Windows + macOS delivery layers)
+// ---------------------------------------------------------------------------
+
+/** A spawn stand-in that records argv and exposes its listeners. */
+function recordingSpawn() {
+  const calls = [];
+  const spawnImpl = (command, args, options) => {
+    const listeners = {};
+    const child = {
+      on(event, handler) {
+        listeners[event] = handler;
+        return child;
+      },
+      unref() {},
+    };
+    calls.push({ command, args, options, listeners });
+    return child;
+  };
+  return { calls, spawnImpl };
+}
+
+test('transport selection covers Windows and macOS and rejects the rest', () => {
+  const deps = { root: process.cwd(), opts: { ...DEFAULTS }, log: () => {} };
+  assert.deepEqual(SUPPORTED_PLATFORMS, ['win32', 'darwin']);
+  assert.equal(createTransport('win32', deps).platform, 'win32');
+  assert.equal(createTransport('darwin', deps).platform, 'darwin');
+  assert.equal(createTransport('linux', deps), null);
+  assert.equal(createTransport('freebsd', deps), null);
+});
+
+test('Windows registers the protocol only when clickFocus is on', () => {
+  const { calls, spawnImpl } = recordingSpawn();
+  const root = process.cwd();
+
+  createWin32Transport({ root, opts: { ...DEFAULTS, clickFocus: false }, log: () => {}, spawnImpl }).prepare();
+  assert.equal(calls.length, 0);
+
+  createWin32Transport({ root, opts: { ...DEFAULTS, clickFocus: true }, log: () => {}, spawnImpl }).prepare();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, 'powershell.exe');
+  assert.deepEqual(calls[0].args.slice(-4), ['-Root', root, '-Aumid', DEFAULTS.aumid]);
+  assert.ok(calls[0].args.includes(join(root, 'scripts', 'register.ps1')));
+});
+
+test('osascript receives title and body as argv, never as script source', () => {
+  const title = '「会话」任务完成';
+  const body = 'he said "hi" \\ and\nsecond line';
+  const args = osascriptArgs(title, body);
+
+  assert.deepEqual(args.slice(0, -2), [
+    '-e', 'on run argv',
+    '-e', 'display notification (item 2 of argv) with title (item 1 of argv)',
+    '-e', 'end run',
+  ]);
+  // Verbatim, unescaped: the script body is constant and never interpolated.
+  assert.equal(args.at(-2), title);
+  assert.equal(args.at(-1), body);
+  assert.ok(!args.slice(0, -2).some((part) => part.includes(title)));
+});
+
+test('macOS sound resolution maps Windows events and honours an override', () => {
+  assert.equal(resolveSound({ soundEvent: 'Notification.Default' }), join(SOUND_DIR, 'Glass.aiff'));
+  assert.equal(resolveSound({ soundEvent: 'Notification.Looping.Alarm' }), join(SOUND_DIR, 'Sosumi.aiff'));
+  assert.equal(resolveSound({ soundEvent: 'Notification.NotAThing' }), join(SOUND_DIR, 'Glass.aiff'));
+  assert.equal(resolveSound({}), join(SOUND_DIR, 'Glass.aiff'));
+  assert.equal(resolveSound({ darwinSound: 'Pop' }), join(SOUND_DIR, 'Pop.aiff'));
+  assert.equal(resolveSound({ darwinSound: 'Pop.aiff' }), join(SOUND_DIR, 'Pop.aiff'));
+  assert.equal(resolveSound({ darwinSound: '/tmp/custom.aiff' }), '/tmp/custom.aiff');
+});
+
+test('macOS critical cue repeats are clamped to 1..5', () => {
+  assert.equal(soundRepeats({}, {}), 1);
+  assert.equal(soundRepeats({ criticalRepeat: 3 }, { critical: true }), 3);
+  assert.equal(soundRepeats({ criticalRepeat: 99 }, { critical: true }), 5);
+  assert.equal(soundRepeats({ criticalRepeat: 0 }, { critical: true }), 1);
+  assert.equal(soundRepeats({ criticalRepeat: 'nope' }, { critical: true }), 1);
+  assert.equal(soundRepeats({ criticalRepeat: 3 }, { critical: false }), 1);
+});
+
+test('the macOS transport raises a banner, then plays the cue', () => {
+  const { calls, spawnImpl } = recordingSpawn();
+  const transport = createDarwinTransport({
+    opts: { ...DEFAULTS },
+    log: () => {},
+    spawnImpl,
+    fileExists: () => true,
+  });
+
+  transport.notify('「会话」任务完成', '回复结束（完成）', {});
+  assert.deepEqual(calls.map((call) => call.command), ['osascript', 'afplay']);
+  assert.deepEqual(calls[0].args, osascriptArgs('「会话」任务完成', '回复结束（完成）'));
+  assert.deepEqual(calls[0].options, { stdio: 'ignore' });
+  assert.deepEqual(calls[1].args, [join(SOUND_DIR, 'Glass.aiff')]);
+});
+
+test('sound: false keeps the banner but skips afplay', () => {
+  const { calls, spawnImpl } = recordingSpawn();
+  const transport = createDarwinTransport({
+    opts: { ...DEFAULTS, sound: false },
+    log: () => {},
+    spawnImpl,
+    fileExists: () => true,
+  });
+  transport.notify('t', 'b', { critical: true });
+  assert.deepEqual(calls.map((call) => call.command), ['osascript']);
+});
+
+test('a critical cue repeats by chaining afplay on exit', () => {
+  const { calls, spawnImpl } = recordingSpawn();
+  const transport = createDarwinTransport({
+    opts: { ...DEFAULTS, criticalRepeat: 3 },
+    log: () => {},
+    spawnImpl,
+    fileExists: () => true,
+  });
+  transport.notify('t', 'b', { critical: true });
+
+  assert.equal(calls.filter((call) => call.command === 'afplay').length, 1);
+  for (let i = 0; i < 5; i += 1) {
+    const afplays = calls.filter((call) => call.command === 'afplay');
+    afplays.at(-1).listeners.exit?.();
+  }
+  // Three total: 1 immediate + 2 chained.
+  assert.equal(calls.filter((call) => call.command === 'afplay').length, 3);
+});
+
+test('a missing cue file skips afplay without skipping the banner', () => {
+  const { calls, spawnImpl } = recordingSpawn();
+  const transport = createDarwinTransport({
+    opts: { ...DEFAULTS },
+    log: () => {},
+    spawnImpl,
+    fileExists: () => false,
+  });
+  transport.notify('t', 'b', {});
+  assert.deepEqual(calls.map((call) => call.command), ['osascript']);
+});
+
+test('a throwing spawn never escapes the macOS transport', () => {
+  const transport = createDarwinTransport({
+    opts: { ...DEFAULTS },
+    log: () => {},
+    spawnImpl: () => {
+      throw new Error('boom');
+    },
+    fileExists: () => false,
+  });
+  assert.doesNotThrow(() => transport.notify('t', 'b', {}));
+});
+
+test('apply() wires both subscriptions on macOS', { skip: process.platform !== 'darwin' }, () => {
+  const subscribed = [];
+  const logs = [];
+  const warns = [];
+  const ctx = {
+    logger: { info: (message) => logs.push(message), warn: (message) => warns.push(message) },
+    on(event) {
+      subscribed.push(event);
+      return () => {};
+    },
+    effect: (fn) => fn,
+  };
+
+  apply(ctx, {});
+  assert.deepEqual(subscribed, ['session/event', 'tools/result']);
+  assert.ok(logs.some((line) => line.includes('enabled on darwin')));
+  assert.ok(warns.some((line) => line.includes('clickFocus is Windows-only')));
 });

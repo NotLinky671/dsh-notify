@@ -20,9 +20,10 @@
         contextCooldownMs: 300000  # 同一会话两次上下文告警的最小间隔（5 分钟）
         dailyTokenBudget: 0        # 当日 token 预算，0 = 关闭（示例：20000000 = 20M）
         sound: true                # 播放提示音（插件自己播，不走 toast 的 <audio>）
-        soundEvent: Notification.Default   # 声音方案里的事件名；短音约 1.3s
-        criticalRepeat: 1          # 强提醒的提示音重复次数（有上限，不会无限响）
-        clickFocus: true           # 点击通知把 DSH 窗口拉到前台
-        aumid: DeepSeek.Harness.Notify
+        soundEvent: Notification.Default   # Windows 声音方案事件名；macOS 会映射成系统音
+        criticalRepeat: 1          # 强提醒的提示音重复次数（macOS 上限 5 次，不会无限响）
+        darwinSound: ''             # 仅 macOS：声音名（如 Pop / Pop.aiff）或绝对路径；留空按 soundEvent 映射
+        clickFocus: true           # 仅 Windows：点击通知把 DSH 窗口拉到前台（macOS 横幅无点击动作）
+        aumid: DeepSeek.Harness.Notify   # 仅 Windows：toast 的 AppUserModelID
         quietHours: null           # 免打扰时段，如 [23, 8] 表示 23:00–08:00 不弹
-        debug: false               # 排查时改 true，会把启动/事件/派发写进 storages\dsh-notify\diag.log
+        debug: false               # 排查时改 true，会额外记录每个事件；启动/派发始终写进 storages\dsh-notify\diag.log
